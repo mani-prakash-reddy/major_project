@@ -1,4 +1,4 @@
-import pefile, re, joblib, sys, requests, pandas as pd
+import pefile, re, sys, requests
 
 model_endpoint = 'http://localhost:5000/predict'
 
@@ -38,13 +38,11 @@ def get_features(file_path):
     return feature_vector
 
 
-# le = joblib.load('label_encoder_fids.pkl')
+# data = get_features(sys.argv[1])
 
-data = get_features(sys.argv[1])
+# features = [float(data[i]) for i in range(7)]
 
-features = [float(data[i]) for i in range(7)]
+# prediction = requests.post(model_endpoint, json={'inputs': features}).json()[
+#     'prediction']
 
-prediction = requests.post(model_endpoint, json={'inputs': features}).json()[
-    'prediction']
-
-print(f"File {sys.argv[1]} is {prediction}")
+# print(f"File {sys.argv[1]} is {prediction}")
