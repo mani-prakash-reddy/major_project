@@ -27,3 +27,6 @@ secret_key.py
 devcontainer.json
 settings.json
 runs/
+
+.vscode/
+.devcontainer/
