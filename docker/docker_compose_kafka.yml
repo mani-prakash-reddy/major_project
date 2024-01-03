@@ -1,0 +1,28 @@
+version: '3'
+services:
+  zookeeper:
+    image: quay.io/debezium/zookeeper:latest
+    ports:
+     - 2181:2181
+     - 2888:2888
+     - 3888:3888
+  kafka:
+    image: quay.io/debezium/kafka:latest
+    ports:
+     - 9092:9092
+    links:
+     - zookeeper
+    environment:
+     - ZOOKEEPER_CONNECT=zookeeper:2181
+     - ADVERTISED_HOST_NAME=host.docker.internal
+    extra_hosts:                                                                
+      - "host.docker.internal:host-gateway"
+
+  pyspark:
+    image: pyspark_build
+    depends_on:
+      - zookeeper
+      - kafka
+    extra_hosts:                                                                
+      - "host.docker.internal:host-gateway"
+    

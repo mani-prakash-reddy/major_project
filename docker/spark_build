@@ -1,0 +1,33 @@
+FROM ubuntu:latest
+
+WORKDIR /app
+
+# Install Java
+RUN apt-get update && apt-get install -y default-jdk
+
+# Install Kafka and ZooKeeper
+RUN apt-get update && apt-get install -y wget python3 python3-pip git
+RUN wget https://downloads.apache.org/kafka/3.6.1/kafka_2.12-3.6.1.tgz && \
+	tar -xzf kafka_2.12-3.6.1.tgz && \
+	mv kafka_2.12-3.6.1 /opt/kafka
+
+# Set environment variables for Kafka and ZooKeeper
+ENV KAFKA_HOME=/opt/kafka
+ENV PATH=$PATH:$KAFKA_HOME/bin
+
+# Copy Kafka configuration file
+COPY server.properties $KAFKA_HOME/config/server.properties
+
+# Expose Kafka and ZooKeeper ports
+EXPOSE 9092 2181
+
+
+RUN pip install pyspark
+RUN pip install git+https://github.com/dpkp/kafka-python.git
+RUN pip install pymongo
+RUN pip install requests
+
+COPY subscriber.py /app
+COPY kafka_startup_script.sh /app
+
+CMD ["bash", "kafka_startup_script.sh"]

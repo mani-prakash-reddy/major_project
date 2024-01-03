@@ -1,42 +1,42 @@
 import requests
 import nfstream
-from os import listdir
+import sys
 import joblib
 
 api_endpoint = "http://localhost:5000/predict"
-
-network_interfaces = listdir("/sys/class/net/")
-network_interfaces.remove("lo")
-
-for i in range(len(network_interfaces)):
-    print(f"{i+1} : {network_interfaces[i]}")
-
-user_input = int(input(f"Select one network interface:"))
-
-
-live_capture = nfstream.NFStreamer(
-    source=network_interfaces[user_input-1], statistical_analysis=False, promiscuous_mode=True, idle_timeout=10)
 
 le = joblib.load("label_encoder_nids.pkl")
 scaler = joblib.load("scaler_nids.pkl")
 pca = joblib.load("pca_nids.pkl")
 
-required_features = ['src_port', 'dst_port', 'protocol', 'ip_version', 'vlan_id',
-            'tunnel_id', 'bidirectional_first_seen_ms',
-            'bidirectional_last_seen_ms', 'bidirectional_duration_ms',
-            'bidirectional_packets', 'bidirectional_bytes', 'src2dst_first_seen_ms',
-            'src2dst_last_seen_ms', 'src2dst_duration_ms', 'src2dst_packets',
-            'src2dst_bytes', 'dst2src_first_seen_ms', 'dst2src_last_seen_ms',
-            'dst2src_duration_ms', 'dst2src_packets', 'dst2src_bytes',
-            'application_name', 'application_category_name', 'user_agent',
-            'content_type']
 
-count = 1
+def get_features_from_pacp_file(pcap_file):
+	flow = nfstream.NFStreamer(
+		source=pcap_file, statistical_analysis=False).to_pandas()
+	# encode the application_name, application_category_name, user_agent, content_type
+	flow['application_name'] = le.fit_transform(flow['application_name'])
+	flow['application_category_name'] = le.fit_transform(
+		flow['application_category_name'])
+	flow['user_agent'] = le.fit_transform(flow['user_agent'])
+	flow['content_type'] = le.fit_transform(flow['content_type'])
+	# drop the columns which are not required
+	flow = flow.drop(['id', 'expiration_id', 'src_ip', 'src_mac', 'src_oui', 'dst_ip', 'dst_mac', 'dst_oui', 'application_is_guessed',
+	                 'application_confidence', 'requested_server_name', 'client_fingerprint', 'server_fingerprint'], axis=1)
+	flow = flow.drop(["vlan_id", "tunnel_id"], axis=1)
+	flow = flow.fillna(0)
+	# flow = flow.drop_duplicates()
+	# print the coloum name if it has string datatype
+	for col in flow.columns:
+		if flow[col].dtype == 'object':
+			print(col)
+	features = flow.values.tolist()
+	# features = np.array(features, dtype=np.float32)
+	return features
 
-for packet in live_capture:
-    data = [packet.src_port, packet.dst_port, packet.protocol, packet.ip_version, packet.bidirectional_first_seen_ms, packet.bidirectional_last_seen_ms, packet.bidirectional_duration_ms, packet.bidirectional_packets, packet.bidirectional_bytes, packet.src2dst_first_seen_ms, packet.src2dst_last_seen_ms, packet.src2dst_duration_ms, packet.src2dst_packets, packet.src2dst_bytes, packet.dst2src_first_seen_ms, packet.dst2src_last_seen_ms, packet.dst2src_duration_ms, packet.dst2src_packets, packet.dst2src_bytes, le.fit_transform(packet.application_name), le.fit_transform(packet.application_category_name), le.fit_transform(packet.user_agent), le.fit_transform(packet.content_type)]
-    data = scaler.transform([data])
+df = get_features_from_pacp_file(sys.argv[1])
+
+for i in range(len(df)):
+    data = scaler.transform([df[i]])
     data = pca.transform(data)
-    prediction = requests.post(api_endpoint, json={"inputs":data.tolist()})
-    print(f"\r{count} : {prediction.json()['prediction']}", end="")
-    count = count + 1
+    prediction = requests.post(api_endpoint, json={"inputs": data.tolist()[0]})
+    print(f"{i+1} : {prediction.json()['prediction']}")

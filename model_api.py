@@ -51,6 +51,11 @@ def predict():
     inputs = torch.tensor(data['inputs']).unsqueeze(0).unsqueeze(2)
     outputs = model(inputs)
     prediction = outputs.item()
+    if prediction >= 0.5:
+        prediction = 1
+    else:
+        prediction = 0
+    
     return jsonify({'prediction': prediction})
 
 
